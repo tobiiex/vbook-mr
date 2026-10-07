@@ -7,8 +7,8 @@
     {
       "name": "Mê Truyện Chữ",
       "author": "ceru",
-      "path": "https://raw.githubusercontent.com/tobiiex/vbook-extensions/main/extension/plugin.zip",
-      "icon": "https://raw.githubusercontent.com/tobiiex/vbook-extensions/main/extension/icon.png",
+      "path": "https://raw.githubusercontent.com/tobiiex/vbook-mr/main/extension/plugin.zip",
+      "icon": "https://raw.githubusercontent.com/tobiiex/vbook-mr/main/extension/icon.png",
       "version": 1,
       "type": "novel",
       "locale": "vi_VN",
