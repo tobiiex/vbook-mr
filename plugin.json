@@ -1,0 +1,19 @@
+{
+  "metadata": {
+    "author": "ceru",
+    "description": "Kho tiện ích mở rộng VBook cá nhân"
+  },
+  "data": [
+    {
+      "name": "Mê Truyện Chữ",
+      "author": "ceru",
+      "path": "https://raw.githubusercontent.com/tobiiex/vbook-extensions/main/extension/plugin.zip",
+      "icon": "https://raw.githubusercontent.com/tobiiex/vbook-extensions/main/extension/icon.png",
+      "version": 1,
+      "type": "novel",
+      "locale": "vi_VN",
+      "source": "https://metruyenchuvn.org",
+      "description": "Đọc truyện online tại MeTruyenChuVN"
+    }
+  ]
+}
