@@ -3,7 +3,7 @@
 ##1. Link Nguồn Mở Rộng
 Tải app tại: [Vbook](https://vbookapp.com/)
 
-https://raw.githubusercontent.com/tobiiex/vbook-mr/main/plugin.json
+##https://raw.githubusercontent.com/tobiiex/vbook-mr/main/plugin.json
 ---
 ##2. Danh sách Extension
 | Icon | Tên | Nguồn | Phiên bản | Ngôn ngữ |
