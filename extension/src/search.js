@@ -1,19 +1,39 @@
 var BASE_URL = "https://metruyenchuvn.org";
 var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-function fetchHtml(url) {
+var LAST_ERR = "";
+function errInfo() { return LAST_ERR ? " (" + LAST_ERR + ")" : ""; }
+
+function tryFetch(url, opts) {
     try {
-        if (typeof fetch === "function") {
-            var r = fetch(url, { headers: { "User-Agent": UA } });
-            if (r && r.ok) return r.html();
+        var r = opts ? fetch(url, opts) : fetch(url);
+        if (!r) { LAST_ERR = "không có phản hồi"; return null; }
+        if (r.ok) return r.html();
+        LAST_ERR = "HTTP " + (r.status || "?") + " tại " + url;
+    } catch (e) { LAST_ERR = String(e); }
+    return null;
+}
+
+function fetchHtml(url) {
+    url = (url || "").replace(/[.\u2026\s]+$/, "");
+    var doc = null;
+    if (typeof fetch === "function") {
+        doc = tryFetch(url, { headers: { "User-Agent": UA, "Referer": BASE_URL + "/" } });
+        if (doc) return doc;
+        doc = tryFetch(url, null);
+        if (doc) return doc;
+        if (url.indexOf("metruyenchuvn.org") !== -1) {
+            doc = tryFetch(url.replace("metruyenchuvn.org", "metruyenchuvn.com"), null);
+            if (doc) return doc;
         }
-    } catch (e) {}
+    }
     try {
         if (typeof Http !== "undefined") {
             var r2 = Http.get(url);
             if (r2 && r2.ok) return r2.html();
+            if (r2 && !LAST_ERR) LAST_ERR = "HTTP " + (r2.status || "?");
         }
-    } catch (e) {}
+    } catch (e2) { LAST_ERR = String(e2); }
     return null;
 }
 
@@ -25,9 +45,133 @@ function absUrl(u) {
     return BASE_URL + "/" + u.replace(/^\//, "");
 }
 
+function count(els) {
+    if (!els) return 0;
+    try { return els.size(); } catch (e) {}
+    return els.length || 0;
+}
+
+function withPage(url, page) {
+    url = url.replace(/\/+$/, "");
+    if (!page || String(page) === "1") return url;
+    return url + (url.indexOf("?") === -1 ? "?" : "&") + "page=" + page;
+}
+
+function hasNextPage(doc, page) {
+    var n = parseInt(page, 10) + 1;
+    return count(doc.select("a[href*='page=" + n + "']")) > 0;
+}
+
 function isNovelLink(href) {
-    if (!href || href.charAt(0) === "#" || href.indexOf("javascript") !== -1) return false;
-    return !/\/(danh-sach|the-loai|tim-kiem|chuong-|tac-gia)/.test(href);
+    if (!href || href.indexOf("javascript") !== -1 || href.indexOf("#") !== -1) return false;
+    return !/\/(danh-sach|the-loai|tim-kiem|tac-gia|contact|tos)(\/|\?|$)/.test(href) && href.indexOf("/chuong-") === -1;
+}
+
+// Tìm khối bao quanh 1 truyện: đi từ thẻ h3 lên cho tới khi khối chứa nhiều hơn 1 truyện
+function findBox(h3) {
+    var box = h3;
+    var best = h3;
+    for (var i = 0; i < 6; i++) {
+        var p = null;
+        try { p = box.parent(); } catch (e) {}
+        if (!p) break;
+        if (count(p.select("h3 a[href]")) > 1) break;
+        box = p;
+        if (count(box.select("img")) > 0) best = box;
+    }
+    return best;
+}
+
+function pickCover(box) {
+    var imgs = box.select("img");
+    var cover = "";
+    imgs.forEach(function (img) {
+        var src = absUrl(img.attr("data-src") || img.attr("data-original") || img.attr("src") || "");
+        if (!src) return;
+        if (src.indexOf("/media/book/") !== -1) { if (cover.indexOf("/media/book/") === -1) cover = src; }
+        else if (!cover) cover = src;
+    });
+    return cover;
+}
+
+function parseList(doc) {
+    var data = [];
+    var seen = {};
+
+    doc.select("h3 a[href]").forEach(function (a) {
+        var link = absUrl(a.attr("href"));
+        if (!isNovelLink(link) || seen[link]) return;
+        var name = (a.text() || "").trim();
+        if (!name) return;
+
+        var h3 = null;
+        try { h3 = a.parent(); } catch (e) {}
+        var box = h3 ? findBox(h3) : a;
+
+        var cover = pickCover(box);
+
+        var author = "";
+        var authorA = box.select("a[href*='/tac-gia/']").first();
+        if (authorA) author = (authorA.text() || "").trim();
+
+        var genres = [];
+        box.select("a[href*='/the-loai/']").forEach(function (g) {
+            var t = (g.text() || "").trim();
+            if (t && genres.indexOf(t) === -1) genres.push(t);
+        });
+
+        var chap = "";
+        var m = /Số chương\s*:\s*([\d.,]+)/.exec(box.text() || "");
+        if (m) chap = m[1];
+
+        var parts = [];
+        if (author) parts.push("Tác giả: " + author);
+        if (genres.length) parts.push("Thể loại: " + genres.join(", "));
+        if (chap) parts.push(chap + " chương");
+
+        seen[link] = true;
+        data.push({
+            name: name,
+            link: link,
+            cover: cover,
+            description: parts.join(" · "),
+            host: BASE_URL
+        });
+    });
+
+    // Dự phòng cho trang chủ: link có ảnh bìa + thuộc tính title
+    if (data.length === 0) {
+        doc.select("a[href][title]").forEach(function (a) {
+            if (count(a.select("img")) === 0) return;
+            var link = absUrl(a.attr("href"));
+            if (!isNovelLink(link) || seen[link]) return;
+            var name = (a.attr("title") || "").replace(/\s*đọc online\s*$/i, "").trim();
+            if (!name) return;
+            seen[link] = true;
+            data.push({ name: name, link: link, cover: pickCover(a), description: "", host: BASE_URL });
+        });
+    }
+    return data;
+}
+
+function normalize(s) {
+    return (s || "").toLowerCase()
+        .replace(/đ/g, "d")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function matchScore(data, keyword) {
+    var tokens = normalize(keyword).split(" ").filter(function (t) { return t; });
+    if (tokens.length === 0) return 0;
+    var score = 0;
+    data.forEach(function (it) {
+        var hay = normalize(it.name) + " " + normalize(it.link.replace(BASE_URL, ""));
+        for (var i = 0; i < tokens.length; i++) {
+            if (hay.indexOf(tokens[i]) !== -1) { score++; break; }
+        }
+    });
+    return score;
 }
 
 function execute(key, page) {
@@ -35,45 +179,27 @@ function execute(key, page) {
     var keyword = (typeof key === "string") ? key.trim() : "";
     if (!keyword) return Response.success([], null);
 
-    var url = BASE_URL + "/tim-kiem?keyword=" + encodeURIComponent(keyword) + "&page=" + encodeURIComponent(String(page));
-    var doc = fetchHtml(url);
-    if (!doc) return Response.error("Không thể tìm kiếm, thử lại sau");
+    var q = encodeURIComponent(keyword);
+    var pg = (String(page) === "1") ? "" : "&page=" + page;
+    // Chưa xác định được địa chỉ tìm kiếm chính xác của web nên thử lần lượt các dạng phổ biến
+    var candidates = [
+        BASE_URL + "/tim-kiem?keyword=" + q + pg,
+        BASE_URL + "/tim-kiem?q=" + q + pg,
+        BASE_URL + "/tim-kiem?tukhoa=" + q + pg,
+        BASE_URL + "/search?keyword=" + q + pg,
+        BASE_URL + "/search?q=" + q + pg,
+        BASE_URL + "/?s=" + q + pg
+    ];
 
-    var data = [];
-    var seen = {};
-    var items = doc.select(".list-truyen .row, .list-novel .row, .list-novel .item, .book-item, .item-truyen, .story-item, .truyen-item");
-    items.forEach(function (item) {
-        var aTag = item.select("h3 a, h2 a, .title a, .book-title a, a[title], a[href]").first();
-        if (!aTag) return;
-        var link = absUrl(aTag.attr("href"));
-        if (!isNovelLink(link) || seen[link]) return;
-
-        var name = aTag.text().trim() || (aTag.attr("title") || "").trim();
-        if (!name) return;
-
-        var cover = "";
-        var imgEl = item.select("img").first();
-        if (imgEl) cover = absUrl(imgEl.attr("data-src") || imgEl.attr("data-original") || imgEl.attr("src") || "");
-
-        var descEl = item.select(".author, .text-muted, .meta").first();
-        seen[link] = true;
-        data.push({
-            name: name,
-            link: link,
-            cover: cover,
-            description: descEl ? descEl.text().trim() : "",
-            host: BASE_URL
-        });
-    });
-
-    var hasNext = false;
-    doc.select(".pagination a").forEach(function (a) {
-        var t = (a.text() || "").trim().toLowerCase();
-        if (a.attr("href") && (t.indexOf("next") !== -1 || t.indexOf("tiếp") !== -1 || t.indexOf("›") !== -1 || t.indexOf("»") !== -1 || t.indexOf("sau") !== -1)) {
-            hasNext = true;
+    for (var i = 0; i < candidates.length; i++) {
+        var doc = fetchHtml(candidates[i]);
+        if (!doc) continue;
+        var data = parseList(doc);
+        // Chỉ nhận kết quả thật sự liên quan tới từ khoá (tránh trường hợp web bỏ qua tham số và trả về trang chủ)
+        if (data.length > 0 && matchScore(data, keyword) > 0) {
+            var next = hasNextPage(doc, page) ? String(parseInt(page, 10) + 1) : null;
+            return Response.success(data, next);
         }
-    });
-
-    var next = (hasNext && data.length > 0) ? String(parseInt(page, 10) + 1) : null;
-    return Response.success(data, next);
+    }
+    return Response.success([], null);
 }

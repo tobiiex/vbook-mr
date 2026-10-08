@@ -2,7 +2,7 @@
   "metadata": {
     "name": "Mê Truyện Chữ VN",
     "author": "ceru",
-    "version": 3,
+    "version": 4,
     "source": "https://metruyenchuvn.org",
     "regexp": "https?://metruyenchuvn\\.org/.*",
     "description": "Đọc truyện online tại MeTruyenChuVN",
