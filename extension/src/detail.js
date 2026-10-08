@@ -1,5 +1,6 @@
 var BASE_URL = "https://metruyenchuvn.org";
 var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 function fetchHtml(url) {
     try {
         if (typeof fetch === "function") {
@@ -16,44 +17,50 @@ function fetchHtml(url) {
     return null;
 }
 
+function absUrl(u) {
+    u = (u || "").trim();
+    if (!u) return "";
+    if (u.indexOf("//") === 0) return "https:" + u;
+    if (u.indexOf("http") === 0) return u;
+    return BASE_URL + "/" + u.replace(/^\//, "");
+}
+
 function execute(url) {
-    let doc = fetchHtml(url);
+    var doc = fetchHtml(url);
     if (!doc) return Response.error("Không thể tải trang chi tiết");
 
-    let titleEl = doc.select("h1[itemprop='name'], h1, .book-title, .title").first();
-    let authorEl = doc.select(".author, a[href*='/tac-gia/'], .book-author, .author-name").first();
-    let coverEl = doc.select(".book-thumb img, .cover img, .thumb img, img[alt*='truyện'], img[alt*='book'], .book-cover img").first();
-    let descEl = doc.select(".book-desc, .desc, .summary, #tab-overview, #gioithieu, .content, .book-content, .description").first();
-    let statusEl = doc.select(".status, .label-status, .book-status, .truyen-status, .status-book, .book-info li b + span").first();
+    var titleEl = doc.select("h1[itemprop='name'], h1, .book-title").first();
+    var authorEl = doc.select("a[href*='/tac-gia/'], .book-author, .author-name, .author").first();
+    var coverEl = doc.select(".book-thumb img, .cover img, .thumb img, .book-cover img, img[alt*='truyện'], img[alt*='book']").first();
+    var descEl = doc.select(".book-desc, .desc, .summary, #tab-overview, #gioithieu, .book-content, .description").first();
+    var statusEl = doc.select(".status, .label-status, .book-status, .truyen-status, .status-book, .book-info li b + span").first();
 
-    let name = titleEl ? titleEl.text().trim() : (doc.select('meta[property="og:title"]').attr('content') || 'Không rõ tên truyện');
-    let author = authorEl ? authorEl.text().trim() : (doc.select('meta[name="description"]').attr('content') || 'Đang cập nhật');
-    let cover = '';
+    var name = titleEl ? titleEl.text().trim() : "";
+    if (!name) name = doc.select("meta[property='og:title']").attr("content") || "Không rõ tên truyện";
+
+    var author = authorEl ? authorEl.text().trim() : "";
+    if (!author) author = "Đang cập nhật";
+
+    var cover = "";
     if (coverEl) {
-        cover = coverEl.attr("src") || coverEl.attr("data-src") || coverEl.attr("data-original") || '';
-        if (cover && cover.startsWith("/")) {
-            cover = BASE_URL + cover;
-        }
+        cover = absUrl(coverEl.attr("data-src") || coverEl.attr("data-original") || coverEl.attr("src") || "");
     }
+    if (!cover) cover = absUrl(doc.select("meta[property='og:image']").attr("content"));
 
-    let description = descEl ? descEl.text().trim() : (doc.select('meta[property="og:description"]').attr('content') || '');
-    let status = statusEl ? statusEl.text().trim() : 'Đang ra';
-    if (!status || !status.trim()) status = 'Đang ra';
+    var description = descEl ? descEl.text().trim() : "";
+    if (!description) description = doc.select("meta[property='og:description']").attr("content") || "";
 
-    let genres = [];
-    doc.select(".genres a, .tags a, a[href*='/the-loai/']").forEach(e => {
-        let genreLink = e.attr("href") || '';
-        if (genreLink.startsWith("/")) {
-            genreLink = BASE_URL + genreLink;
-        }
+    var status = statusEl ? statusEl.text().trim() : "";
+    if (!status) status = "Đang ra";
 
-        let title = e.text().trim();
-        if (title && genreLink) {
-            genres.push({
-                title: title,
-                input: genreLink,
-                script: "genre.js"
-            });
+    var genres = [];
+    var seen = {};
+    doc.select(".genres a, .tags a, a[href*='/the-loai/']").forEach(function (e) {
+        var genreLink = absUrl(e.attr("href"));
+        var title = e.text().trim();
+        if (title && genreLink && !seen[genreLink]) {
+            seen[genreLink] = true;
+            genres.push({ title: title, input: genreLink, script: "genre.js" });
         }
     });
 
@@ -62,7 +69,7 @@ function execute(url) {
         cover: cover,
         author: author,
         description: description,
-        detail: `Tác giả: ${author}<br>Trạng thái: ${status}`,
+        detail: "Tác giả: " + author + "<br>Trạng thái: " + status,
         ongoing: status.toLowerCase().indexOf("hoàn thành") === -1,
         genres: genres,
         host: BASE_URL

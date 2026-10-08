@@ -1,5 +1,6 @@
 var BASE_URL = "https://metruyenchuvn.org";
 var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 function fetchHtml(url) {
     try {
         if (typeof fetch === "function") {
@@ -16,119 +17,63 @@ function fetchHtml(url) {
     return null;
 }
 
+function absUrl(u) {
+    u = (u || "").trim();
+    if (!u) return "";
+    if (u.indexOf("//") === 0) return "https:" + u;
+    if (u.indexOf("http") === 0) return u;
+    return BASE_URL + "/" + u.replace(/^\//, "");
+}
+
+function isNovelLink(href) {
+    if (!href || href.charAt(0) === "#" || href.indexOf("javascript") !== -1) return false;
+    return !/\/(danh-sach|the-loai|tim-kiem|chuong-|tac-gia)/.test(href);
+}
+
 function execute(key, page) {
-    if (!page) page = '1';
+    if (!page) page = "1";
+    var keyword = (typeof key === "string") ? key.trim() : "";
+    if (!keyword) return Response.success([], null);
 
-    let keyword = (typeof key === 'string' && key.trim() && !key.startsWith('http')) ? key.trim() : 'kiem';
-    let keywordLower = keyword.toLowerCase();
-    let url = 'https://metruyenchuvn.org/tim-kiem?keyword=' + encodeURIComponent(keyword) + '&page=' + encodeURIComponent(String(page));
+    var url = BASE_URL + "/tim-kiem?keyword=" + encodeURIComponent(keyword) + "&page=" + encodeURIComponent(String(page));
+    var doc = fetchHtml(url);
+    if (!doc) return Response.error("Không thể tìm kiếm, thử lại sau");
 
-    let doc = null;
-    if (typeof fetchHtml === 'function') {
-        doc = fetchHtml(url) || fetchHtml('https://metruyenchuvn.org/');
-    } else if (typeof Http !== 'undefined') {
-        try {
-            doc = Http.get(url).html();
-        } catch (e) {
-            doc = Http.get('https://metruyenchuvn.org/').html();
-        }
-    } else if (typeof fetch === 'function') {
-        let res = fetch(url);
-        if (res && res.ok) {
-            doc = typeof res.html === 'function' ? res.html() : null;
-        }
-        if (!doc) {
-            let homeRes = fetch('https://metruyenchuvn.org/');
-            if (homeRes && homeRes.ok && typeof homeRes.html === 'function') {
-                doc = homeRes.html();
-            }
-        }
-    }
+    var data = [];
+    var seen = {};
+    var items = doc.select(".list-truyen .row, .list-novel .row, .list-novel .item, .book-item, .item-truyen, .story-item, .truyen-item");
+    items.forEach(function (item) {
+        var aTag = item.select("h3 a, h2 a, .title a, .book-title a, a[title], a[href]").first();
+        if (!aTag) return;
+        var link = absUrl(aTag.attr("href"));
+        if (!isNovelLink(link) || seen[link]) return;
 
-    if (!doc) {
-        return null;
-    }
+        var name = aTag.text().trim() || (aTag.attr("title") || "").trim();
+        if (!name) return;
 
-    let novelList = [];
-    let addNovel = (name, href, cover, description) => {
-        if (!name || !href) return;
-        if (href.includes('javascript') || href.includes('/danh-sach') || href.includes('/the-loai') || href.includes('/tim-kiem') || href.includes('/chuong-') || href.startsWith('#')) return;
+        var cover = "";
+        var imgEl = item.select("img").first();
+        if (imgEl) cover = absUrl(imgEl.attr("data-src") || imgEl.attr("data-original") || imgEl.attr("src") || "");
 
-        let normalizedHref = href;
-        if (!normalizedHref.startsWith('http')) {
-            normalizedHref = 'https://metruyenchuvn.org/' + normalizedHref.replace(/^\//, '');
-        }
-
-        if (!novelList.some(n => n.link === normalizedHref)) {
-            novelList.push({
-                name: name.trim(),
-                link: normalizedHref,
-                cover: cover || '',
-                description: description || '',
-                host: 'https://metruyenchuvn.org'
-            });
-        }
-    };
-
-    let items = doc.select('.list-truyen .row, .list-novel .row, .list-novel .item, .book-item, .item-truyen, .story-item, .book, .truyen-item, .item, .story');
-    items.forEach(item => {
-        if (!item) return;
-
-        let titleEl = item.select('h3 a, h2 a, .title a, .book-title a, a[title], a[href]').first();
-        if (!titleEl) return;
-
-        let title = titleEl.text().trim();
-        let href = (titleEl.attr('href') || '').trim();
-        if (!title || !href) return;
-
-        let slug = href.split('/').filter(Boolean).slice(-1)[0] || '';
-        let textMatch = title.toLowerCase().indexOf(keywordLower) !== -1 || slug.toLowerCase().indexOf(keywordLower) !== -1 || href.toLowerCase().indexOf(keywordLower) !== -1;
-        if (!textMatch && keywordLower !== 'kiem') return;
-
-        if (href.includes('/danh-sach') || href.includes('/the-loai') || href.includes('/tim-kiem') || href.includes('/chuong-') || href.startsWith('#')) return;
-
-        let coverEl = item.select('img').first();
-        let cover = '';
-        if (coverEl) {
-            cover = coverEl.attr('data-src') || coverEl.attr('data-original') || coverEl.attr('src') || '';
-            if (cover && !cover.startsWith('http')) {
-                cover = 'https://metruyenchuvn.org/' + cover.replace(/^\//, '');
-            }
-        }
-
-        let author = item.select('.author, .text-muted, .meta').text().trim();
-        addNovel(title, href, cover, author);
-    });
-
-    if (novelList.length === 0) {
-        let links = doc.select('a[href]');
-        links.forEach(a => {
-            let href = (a.attr('href') || '').trim();
-            let name = (a.text() || '').trim();
-            if (!href || !name || name.length <= 3) return;
-
-            let slug = href.split('/').filter(Boolean).slice(-1)[0] || '';
-            let textMatch = name.toLowerCase().indexOf(keywordLower) !== -1 || slug.toLowerCase().indexOf(keywordLower) !== -1;
-            if (!textMatch && keywordLower !== 'kiem') return;
-
-            addNovel(name, href, '', '');
+        var descEl = item.select(".author, .text-muted, .meta").first();
+        seen[link] = true;
+        data.push({
+            name: name,
+            link: link,
+            cover: cover,
+            description: descEl ? descEl.text().trim() : "",
+            host: BASE_URL
         });
-    }
+    });
 
-    let nextPage = null;
-    let paginations = doc.select('.pagination a');
-    paginations.forEach(a => {
-        if (nextPage) return;
-
-        let href = a.attr('href');
-        let text = (a.text() || '').trim().toLowerCase();
-        if (!href) return;
-
-        if (text.includes('next') || text.includes('tiếp') || text.includes('›') || text.includes('»') || text.includes('sau')) {
-            nextPage = href;
+    var hasNext = false;
+    doc.select(".pagination a").forEach(function (a) {
+        var t = (a.text() || "").trim().toLowerCase();
+        if (a.attr("href") && (t.indexOf("next") !== -1 || t.indexOf("tiếp") !== -1 || t.indexOf("›") !== -1 || t.indexOf("»") !== -1 || t.indexOf("sau") !== -1)) {
+            hasNext = true;
         }
     });
 
-    let next = nextPage ? String(parseInt(page, 10) + 1) : null;
-    return Response.success(novelList.slice(0, 15), next);
+    var next = (hasNext && data.length > 0) ? String(parseInt(page, 10) + 1) : null;
+    return Response.success(data, next);
 }

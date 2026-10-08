@@ -68,13 +68,31 @@ function parseList(doc) {
     return data;
 }
 
+// Không có url: trả về danh sách thể loại lấy từ trang chủ.
+// Có url (vd: /the-loai/tien-hiep): trả về danh sách truyện của thể loại, có phân trang.
 function execute(url, page) {
     if (!page) page = "1";
-    var paged = url.indexOf("/danh-sach") !== -1;
-    var doc = fetchHtml(paged ? withPage(url, page) : url);
-    if (!doc) return Response.error("Không thể tải trang: " + url);
+
+    if (!url) {
+        var home = fetchHtml(BASE_URL);
+        if (!home) return Response.error("Không thể tải danh sách thể loại");
+        var genres = [];
+        var seenG = {};
+        home.select("a[href*='/the-loai/']").forEach(function (a) {
+            var href = absUrl(a.attr("href"));
+            var title = a.text().trim();
+            if (!title || !href || seenG[href]) return;
+            seenG[href] = true;
+            genres.push({ title: title, input: href, script: "genre.js" });
+        });
+        if (genres.length === 0) return Response.error("Không tìm thấy thể loại");
+        return Response.success(genres);
+    }
+
+    var doc = fetchHtml(withPage(absUrl(url), page));
+    if (!doc) return Response.error("Không thể tải thể loại");
 
     var data = parseList(doc);
-    var next = (paged && data.length > 0) ? String(parseInt(page, 10) + 1) : null;
+    var next = data.length > 0 ? String(parseInt(page, 10) + 1) : null;
     return Response.success(data, next);
 }
