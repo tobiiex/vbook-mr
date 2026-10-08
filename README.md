@@ -8,7 +8,7 @@
 ## 2. Danh sách Extension
 | Icon | Tên | Nguồn | Phiên bản | Ngôn ngữ |
 | :---: | :--- | :--- | :---: | :---: |
-| <img src="extension/icon.png" width="40" height="40" alt="Icon"> | [Mê Truyện Chữ](https://metruyenchuvn.org) | [metruyenchuvn.org](https://metruyenchuvn.org) | v1 | vi_VN |
+| <img src="extension/icon.png" width="40" height="40" alt="Icon"> | [Mê Truyện Chữ](https://metruyenchuvn.org) | [metruyenchuvn.org](https://metruyenchuvn.org) | v2 | vi_VN |
 ---
 ## 3. Nguồn Cộng đồng
 
