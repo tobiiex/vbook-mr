@@ -1,23 +1,26 @@
 {
-  "metadata": {
-    "name": "Mê Truyện Chữ VN",
-    "author": "ceru",
-    "version": 10,
-    "source": "https://metruyenchuvn.com.vn",
-    "regexp": "https?://metruyenchuvn\\.com\\.vn/.*",
-    "description": "Đọc truyện online tại MeTruyenChuVN",
-    "locale": "vi_VN",
-    "type": "novel"
-  },
-  "script": {
-    "home": "home.js",
-    "genre": "genre.js",
-    "genrecontent": "genrecontent.js",
-    "detail": "detail.js",
-    "toc": "toc.js",
-    "chap": "chap.js",
-    "search": "search.js",
-    "homecontent": "homecontent.js",
-    "suggest": "suggest.js"
-  }
+  "novel": [
+    {
+      "folder": "mtcvn",
+      "name": "Mê truyện chữ VN",
+      "author": "ceru",
+      "description": "Đọc truyện trên Mê Truyện Chữ VN",
+      "source": "https://metruyenchu.com.vn/",
+      "version": 1,
+      "type": "novel",
+      "locale": "vi_VN",
+      "relativePath": "extensions/novel/mtcvn",
+      "metadata": {
+        "name": "Mê truyện chữ VN",
+        "author": "ceru",
+        "version": 10,
+        "source": "https://metruyenchu.com.vn/",
+        "regexp": "metruyenchu\\.com\\.vn/[^/]+/?$",
+        "description": "Đọc truyện trên Mê Truyện Chữ VN",
+        "locale": "vi_VN",
+        "type": "novel",
+        "language": "javascript"
+      }
+    }
+  ]
 }
